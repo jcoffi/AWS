@@ -1,0 +1,84 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Deploys necessary s3 buckets for EDW POC",
+    "Outputs": {
+		"EDWBucket": {"Value": {"Fn::GetAtt": ["Bucket","Arn"]}}
+    },
+    "Parameters": {
+		"Environment": {
+			"AllowedValues": ["dev","test","prod"],
+			"Default": "dev",
+			"Description": "Type of environment you are creating",
+			"Type": "String"
+		},
+        "EnvironmentTypeIndex": {
+			"Description": "Iteration of environment you are creating",
+			"Type": "String"
+		},
+        "EDWBucket": {
+            "Description": "The name of the bucket used for this solution. Buckets must be globally unique.",
+            "Type": "String"
+        },
+		"LoggingBucket": {
+			"Description": "S3 logging bucket",
+			"Type": "String",
+			"Default": "enterpriseeventlogging"
+		},
+        "KMSS3Key": {
+            "Default": "EDWDevkey",
+            "Description": "KMS Key to use for bucket encryption",
+            "Type": "String"
+        }
+    },
+    "Resources": {
+        "Bucket": {
+			"Type": "AWS::S3::Bucket",
+            "Properties": {
+                "AccessControl": "Private",
+                "BucketName": {"Ref": "EDWBucket"},
+				"BucketEncryption" : {
+						"ServerSideEncryptionConfiguration" : [{
+							"ServerSideEncryptionByDefault" : {
+								"KMSMasterKeyID" : {"Ref": "KMSS3Key"},
+								"SSEAlgorithm" : "aws:kms"}
+						}]
+				},
+				"Tags": [
+                    {
+                        "Key": "Application",
+                        "Value": "Enterprise Data Warehouse POC"
+                    },
+                    {
+                        "Key": "Environment",
+                        "Value": {
+                            "Fn::Sub": "${Environment}-${EnvironmentTypeIndex}"
+                        }
+                    },
+                    {
+                        "Key": "Program",
+                        "Value": "EDMS"
+                    },
+                    {
+                        "Key": "HIPPA",
+                        "Value": "Yes"
+                    },					
+                    {
+                        "Key": "Project",
+                        "Value": "EDW"
+                    },
+					{
+                        "Key": "Category",
+                        "Value": "4"
+                    }
+                ],
+				"LoggingConfiguration":{
+					"DestinationBucketName" : {"Ref": "LoggingBucket"},
+					"LogFilePrefix" : {"Fn::Sub": "EDW-${Environment}-${EnvironmentTypeIndex}"}
+				},
+                "VersioningConfiguration": {
+                    "Status": "Enabled"
+                }
+			}
+        }
+    }
+}

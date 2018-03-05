@@ -1,0 +1,672 @@
+{
+  "Description": "Matillion ETL CloudFormation: POC with existing AWS resources",
+  "Mappings": {
+    "RegionMap": {
+      "ap-northeast-1": {
+        "AMI": "ami-6c3aee0a"
+      },
+      "ap-northeast-2": {
+        "AMI": "ami-63c51f0d"
+      },
+      "ap-south-1": {
+        "AMI": "ami-7880c117"
+      },
+      "ap-southeast-1": {
+        "AMI": "ami-3196e452"
+      },
+      "ap-southeast-2": {
+        "AMI": "ami-569b7b34"
+      },
+      "ca-central-1": {
+        "AMI": "ami-6d58e109"
+      },
+      "eu-central-1": {
+        "AMI": "ami-5e79ca31"
+      },
+      "eu-west-1": {
+        "AMI": "ami-9a854fe3"
+      },
+      "eu-west-2": {
+        "AMI": "ami-a74052c3"
+      },
+      "sa-east-1": {
+        "AMI": "ami-e3f28e8f"
+      },
+      "us-east-1": {
+        "AMI": "ami-69c73a13"
+      },
+      "us-east-2": {
+        "AMI": "ami-023c1167"
+      },
+      "us-west-1": {
+        "AMI": "ami-34231354"
+      },
+      "us-west-2": {
+        "AMI": "ami-bc837bc4"
+      }
+    }
+  },
+  "Metadata": {
+    "AWS::CloudFormation::Interface": {
+      "ParameterGroups": [
+        {
+          "Label": {
+            "default": "Networking and Security Configuration"
+          },
+          "Parameters": [
+            "KeyPair",
+            "VPC",
+            "VpcCidrBlock",
+            "PrimaryAZ",
+            "SecondaryAZ",
+            "Subnet1",
+            "Subnet2",
+            "PublicSubnet",
+            "PrivateSubnets",
+            "PublicSubnetCidr",
+            "PrimaryPublicSubnetCidr",
+            "SecondaryPublicSubnetCidr",
+            "PrivateSubnetCidr",
+            "PrimaryPrivateSubnetCidr",
+            "SecondaryPrivateSubnetCidr",
+            "InboundCidr",
+            "InboundCidrInstance",
+            "METLSecurityGroup",
+            "IAMRole"
+          ]
+        }
+      ],
+      "ParameterLabels": {
+        "DBAllocatedStorage": {
+          "default": "Storage Size"
+        },
+        "IAMRole": {
+          "default": "IAM Role Name"
+        },
+        "InboundCidr": {
+          "default": "Inbound CIDR"
+        },
+        "InboundCidrALB": {
+          "default": "Security Group IPv4 CIDR"
+        },
+        "InboundCidrInstance": {
+          "default": "Inbound IPv4 CIDR"
+        },
+        "InstanceTypeParameter": {
+          "default": "Instance Type"
+        },
+        "KeyPair": {
+          "default": "Keypair Name"
+        },
+        "PostgresDatabaseName": {
+          "default": "Database Name"
+        },
+        "PostgresHostname": {
+          "default": "Hostname"
+        },
+        "PostgresPassword": {
+          "default": "Master Password"
+        },
+        "PostgresPort": {
+          "default": "Port"
+        },
+        "PostgresUser": {
+          "default": "Master Username"
+        },
+        "PrimaryAZ": {
+          "default": "AZ #1"
+        },
+        "PrimaryPrivateSubnetCidr": {
+          "default": "Private Subnet #1"
+        },
+        "PrimaryPublicSubnetCidr": {
+          "default": "Pubic Subnet #1"
+        },
+        "PrivateSubnets": {
+          "default": "Private Subnets"
+        },
+        "PublicSubnetCidr": {
+          "default": "Public Subnet"
+        },
+        "RdsDBClass": {
+          "default": "Instance Class"
+        },
+        "RealmConName": {
+          "default": "Username"
+        },
+        "RealmConPass": {
+          "default": "Connection Password"
+        },
+        "RealmConURL": {
+          "default": "URL"
+        },
+        "RealmMETLAPIRole": {
+          "default": "API Role"
+        },
+        "RealmMETLAdminRole": {
+          "default": "Admin Role"
+        },
+        "RealmMETLRole": {
+          "default": "Login Role"
+        },
+        "RealmRoleBase": {
+          "default": "Role Base"
+        },
+        "RealmRoleName": {
+          "default": "Role Name"
+        },
+        "RealmRoleSearch": {
+          "default": "Role Search"
+        },
+        "RealmUserBase": {
+          "default": "User Base"
+        },
+        "RealmUserSearch": {
+          "default": "User Search"
+        },
+        "RedshiftDatabaseName": {
+          "default": "Database Name"
+        },
+        "RedshiftNodeType": {
+          "default": "Node Type"
+        },
+        "RedshiftPassword": {
+          "default": "Master Password"
+        },
+        "RedshiftPort": {
+          "default": "Port"
+        },
+        "RedshiftSize": {
+          "default": "Redshift Nodes"
+        },
+        "RedshiftUser": {
+          "default": "Master Username"
+        },
+        "SecondaryAZ": {
+          "default": "AZ #2"
+        },
+        "SecondaryPrivateSubnetCidr": {
+          "default": "Private Subnet #2"
+        },
+        "SecondaryPublicSubnetCidr": {
+          "default": "Public Subnet #2"
+        },
+        "METLSecurityGroup": {
+          "default": "Security Group"
+        },
+        "Subnet1": {
+          "default": "Primary Subnet"
+        },
+        "Subnet2": {
+          "default": "Secondary Subnet"
+        },
+        "VPC": {
+          "default": "VPC Id"
+        },
+        "VpcCidrBlock": {
+          "default": "VPC IPv4 CIDR"
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "DefaultMatillionUsername": {
+      "Description": "Default Matillion Username",
+      "Value": "ec2-user"
+    },
+    "Ec2Instance0PrivateEndpoint": {
+      "Description": "Private Endpoint for Matillion Instance",
+      "Value": {
+        "Fn::GetAtt": [
+          "Ec2Instance0",
+          "PrivateIp"
+        ]
+      }
+    },
+    "Ec2Instance0id": {
+      "Description": "Instance ID (default password)",
+      "Value": {
+        "Ref": "Ec2Instance0"
+      }
+    }
+  },
+  "Parameters": {
+    "VPC": {
+      "Description": "VPC where the EDW Solution will abide",
+      "Type": "String"
+    },
+    "KeyPair": {
+      "Description": "The selected key pair will be added to the set of keys authorized for this instance",
+      "Type": "String"
+    },
+    "EDWBucket": {
+      "Description": "Bucket Name for the EDW Solution",
+      "Type": "String"
+    },
+    "KMSS3Key": {
+      "Description": "Key name for Matillion",
+      "Type": "String"
+    },
+    "Environment": {
+      "Description": "The selected key pair will be added to the set of keys authorized for this instance",
+      "Type": "String",
+      "AllowedValues": [
+        "dev",
+        "test",
+        "prod"
+      ]
+    },
+    "EnvironmentTypeIndex": {
+      "Description": "The selected key pair will be added to the set of keys authorized for this instance",
+      "Type": "Number"
+    },
+    "SubnetId": {
+      "Description": "An existing Public subnet to launch the Matillion ec2 instance(s) into.",
+      "Type": "String"
+    },
+    "RealmConName": {
+      "Description": "Connection Name, Example: administrator@INTERNAL.DOMAIN.COM",
+      "Type": "String"
+    },
+    "RealmConPass": {
+      "Description": "The password for the connection username used for initial bind.",
+      "NoEcho": true,
+      "Type": "String"
+    },
+    "RealmConURL": {
+      "Description": "The URL to your directory server, Example: ldap://10.10.10.254:389",
+      "Type": "String"
+    },
+    "RealmMETLAPIRole": {
+      "Description": "The name of an existing group in the directory server whose users will be allowed to administer Matillion. Role names are case-sensitive.",
+      "Type": "String"
+    },
+    "RealmMETLAdminRole": {
+      "Description": "The name of an existing group in the directory server whose users will be allowed to administer Matillion. Role names are case-sensitive.",
+      "Type": "String"
+    },
+    "RealmMETLRole": {
+      "Description": "The name of an existing group in the directory server whose users will be allowed to login. Role names are case-sensitive.",
+      "Type": "String"
+    },
+    "RealmRoleBase": {
+      "Description": "The subtree below which groups are stored in the directory tree, Example: cn=Groups,dc=INTERNAL,dc=domain,dc=com",
+      "Type": "String"
+    },
+    "RealmRoleName": {
+      "Description": "The LDAP attribute used to identify a group or role, Example: cn",
+      "Type": "String"
+    },
+    "RealmRoleSearch": {
+      "Description": "The LDAP attribute to use to identify groups or roles, Example: member={0}",
+      "Type": "String"
+    },
+    "RealmUserBase": {
+      "Description": "The subtree below which users are stored in the directory tree, Example: cn=Users,dc=INTERNAL,dc=domain,dc=com",
+      "Type": "String"
+    },
+    "RealmUserSearch": {
+      "Description": "The LDAP attribute to use for identifying users, Example: sAMAccountName={0}",
+      "Type": "String"
+    }
+  },
+  "Resources": {
+    "MatillionSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Allow http to client host",
+        "VpcId": {
+          "Ref": "VPC"
+        },
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "80",
+            "ToPort": "80",
+            "CidrIp": "0.0.0.0/0"
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "22",
+            "ToPort": "22",
+            "CidrIp": "0.0.0.0/0"
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "443",
+            "ToPort": "443",
+            "CidrIp": "0.0.0.0/0"
+          },
+          {
+            "IpProtocol": "-1",
+            "CidrIp": "192.168.55.210/32"
+          }
+        ],
+        "SecurityGroupEgress": [
+          {
+            "IpProtocol": "-1",
+            "CidrIp": "0.0.0.0/0"
+          }
+        ]
+      }
+    },
+    "Ec2Instance0": {
+      "Metadata": {
+        "AWS::CloudFormation::Init": {
+          "config": {
+            "commands": {
+              "setup": {
+                "command": "/sbin/service tomcat8 stop && rm -r /var/log/tomcat8/catalina.out && /sbin/service tomcat8 start"
+              }
+            },
+            "files": {
+              "/etc/sysconfig/tomcat8": {
+                "content": "echo No further configuration required",
+                "group": "root",
+                "mode": "000644",
+                "owner": "root"
+              }
+            }
+          }
+        }
+      },
+      "Properties": {
+        "NetworkInterfaces": [
+          {
+            "AssociatePublicIpAddress": false,
+            "DeleteOnTermination": true,
+            "DeviceIndex": "0",
+            "SubnetId": {
+              "Ref": "SubnetId"
+            },
+            "GroupSet": [
+              {
+                "Ref": "MatillionSecurityGroup"
+              }
+            ]
+          }
+        ],
+        "IamInstanceProfile": {
+          "Ref": "MatillionInstanceProfile"
+        },
+        "ImageId": {
+          "Fn::FindInMap": [
+            "RegionMap",
+            {
+              "Ref": "AWS::Region"
+            },
+            "AMI"
+          ]
+        },
+        "InstanceType": "m4.large",
+        "KeyName": {
+          "Ref": "KeyPair"
+        },
+        "Tags": [
+          {
+            "Key": "Application",
+            "Value": "Enterprise Data Warehouse POC"
+          },
+          {
+            "Key": "Environment",
+            "Value": {
+              "Fn::Sub": "${Environment}-${EnvironmentTypeIndex}"
+            }
+          },
+          {
+            "Key": "Program",
+            "Value": "EDMS"
+          },
+          {
+            "Key": "HIPPA",
+            "Value": "Yes"
+          },
+          {
+            "Key": "Project",
+            "Value": "EDW"
+          },
+          {
+            "Key": "Category",
+            "Value": "4"
+          },
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "Matillion-EDW-${Environment}-${EnvironmentTypeIndex}"
+            }
+          }
+        ],
+        "UserData": {
+          "Fn::Base64": {
+            "Fn::Join": [
+              "",
+              [
+                "#!/bin/bash -xe \n",
+                "yum update -y aws-cfn-bootstrap \n",
+                "yum install -y awslogs xmlstarlet openldap-clients-2.4.40-12.30.amzn1.x86_64 \n",
+                "service awslogs start \n",
+                "sudo chkconfig awslogs on \n",
+                "/opt/aws/bin/cfn-init -v ",
+                " --stack ",
+                {
+                  "Ref": "AWS::StackName"
+                },
+                " --resource ",
+                "Ec2Instance0",
+                " --region ",
+                {
+                  "Ref": "AWS::Region"
+                },
+                "\n",
+                "cp /etc/tomcat8/server.xml /etc/tomcat8/server.bkp\n",
+                "xmlstarlet ed --inplace -d \"/Server/Service/Engine/Realm\" ",
+                "-s '/Server/Service/Engine' -t elem -n Realm -v \"\" ",
+                "-i '/Server/Service/Engine/Realm' -t attr -n className -v org.apache.catalina.realm.JNDIRealm ",
+                "-i '/Server/Service/Engine/Realm[@className=\"org.apache.catalina.realm.JNDIRealm\"]' -t attr -n connectionName -v ",
+                {
+                  "Ref": "RealmConName"
+                },
+                " -i '/Server/Service/Engine/Realm[@className=\"org.apache.catalina.realm.JNDIRealm\"]' -t attr -n connectionPassword -v ",
+                {
+                  "Ref": "RealmConPass"
+                },
+                " -i '/Server/Service/Engine/Realm[@className=\"org.apache.catalina.realm.JNDIRealm\"]' -t attr -n connectionURL -v ",
+                {
+                  "Ref": "RealmConURL"
+                },
+                " -i '/Server/Service/Engine/Realm[@className=\"org.apache.catalina.realm.JNDIRealm\"]' -t attr -n roleBase -v ",
+                {
+                  "Ref": "RealmRoleBase"
+                },
+                " -i '/Server/Service/Engine/Realm[@className=\"org.apache.catalina.realm.JNDIRealm\"]' -t attr -n roleName -v ",
+                {
+                  "Ref": "RealmRoleName"
+                },
+                " -i '/Server/Service/Engine/Realm[@className=\"org.apache.catalina.realm.JNDIRealm\"]' -t attr -n roleSearch -v ",
+                {
+                  "Ref": "RealmRoleSearch"
+                },
+                " -i '/Server/Service/Engine/Realm[@className=\"org.apache.catalina.realm.JNDIRealm\"]' -t attr -n userBase -v ",
+                {
+                  "Ref": "RealmUserBase"
+                },
+                " -i '/Server/Service/Engine/Realm[@className=\"org.apache.catalina.realm.JNDIRealm\"]' -t attr -n userSearch -v ",
+                {
+                  "Ref": "RealmUserSearch"
+                },
+                " /etc/tomcat8/server.xml \n",
+                "cp /usr/share/emerald/WEB-INF/security.fragment.enabled /usr/share/emerald/WEB-INF/security.fragment \n",
+                "sed -i -e \"s/\\(<role-name>\\)\\([[:alnum:]]\\+\\?\\)\\(<\\/role-name>\\)/\\1",
+                {
+                  "Ref": "RealmMETLRole"
+                },
+                "\\3/g\" /usr/share/emerald/WEB-INF/security.fragment  \n",
+                "sed -i '/^ADMIN_ROLE_NAME=/{h;s/=.*/=",
+                {
+                  "Ref": "RealmMETLAdminRole"
+                },
+                "/};${x;/^$/{s//ADMIN_ROLE_NAME=",
+                {
+                  "Ref": "RealmMETLAdminRole"
+                },
+                "/;H};x}' /usr/share/emerald/WEB-INF/classes/Emerald.properties \n",
+                "sed -i '/^API_SECURITY_GROUP=/{h;s/=.*/=",
+                {
+                  "Ref": "RealmMETLAPIRole"
+                },
+                "/};${x;/^$/{s//API_SECURITY_GROUP=",
+                {
+                  "Ref": "RealmMETLAPIRole"
+                },
+                "/;H};x}' /usr/share/emerald/WEB-INF/classes/Emerald.properties \n",
+                "sudo service tomcat8 restart"
+              ]
+            ]
+          }
+        }
+      },
+      "Type": "AWS::EC2::Instance"
+    },
+    "MatillionInstanceProfile": {
+      "Properties": {
+        "Roles": [
+          {
+            "Ref": "MatillionRole"
+          }
+        ]
+      },
+      "Type": "AWS::IAM::InstanceProfile"
+    },
+    "MatillionRole": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "sts:AssumeRole"
+              ],
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "ec2.amazonaws.com"
+                ]
+              }
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Sid": "VisualEditor0",
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:DescribeLogStreams",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents",
+                    "kms:Decrypt",
+                    "kms:GenerateDataKeyWithoutPlaintext",
+                    "kms:Encrypt",
+                    "kms:ListKeyPolicies",
+                    "kms:ListRetirableGrants",
+                    "kms:DescribeKey",
+                    "kms:ListGrants",
+                    "s3:ListBucketByTags",
+                    "s3:GetObjectVersionTagging",
+                    "s3:ListBucketVersions",
+                    "s3:RestoreObject",
+                    "s3:ListBucket",
+                    "s3:ReplicateObject",
+                    "s3:GetObjectVersionTorrent",
+                    "s3:AbortMultipartUpload",
+                    "s3:GetObjectTagging",
+                    "s3:DeleteObject",
+                    "s3:ListBucketMultipartUploads",
+                    "s3:ListMultipartUploadParts",
+                    "s3:PutObject",
+                    "s3:GetObject",
+                    "s3:GetObjectTorrent",
+                    "s3:ReplicateDelete"
+                  ],
+                  "Resource": [
+                    "arn:aws:logs:*:*:*",
+                    {
+                      "Fn::Sub": "${EDWBucket}/*"
+                    },
+                    {
+                      "Fn::Sub": "${EDWBucket}-unit-test/*"
+                    },
+                    {
+                      "Ref": "EDWBucket"
+                    },
+                    {
+                      "Fn::Sub": "${EDWBucket}-unit-test"
+                    },
+                    {
+                      "Ref": "KMSS3Key"
+                    }
+                  ]
+                },
+                {
+                  "Sid": "VisualEditor1",
+                  "Effect": "Allow",
+                  "Action": [
+                    "sqs:DeleteMessage",
+                    "sqs:ListQueues",
+                    "sqs:GetQueueUrl",
+                    "sqs:SendMessage",
+                    "sqs:ReceiveMessage",
+                    "cloudwatch:PutMetricData",
+                    "ec2:DescribeInstances",
+                    "ec2:CreateTags",
+                    "ec2:DescribeVolumes",
+                    "ec2:CreateSnapshot",
+                    "sns:CreateTopic",
+                    "sns:ListTopics",
+                    "sns:Publish",
+                    "cloudwatch:ListMetrics",
+                    "s3:ListObjects",
+                    "s3:ListAllMyBuckets",
+                    "s3:HeadBucket",
+                    "redshift:DescribeClusters",
+                    "kms:ReEncryptFrom",
+                    "kms:ListKeys",
+                    "kms:ListAliases",
+                    "kms:GenerateDataKey",
+                    "kms:ReEncryptTo",
+                    "rds:DescribeDBInstances"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "VisualEditor3",
+                  "Effect": "Allow",
+                  "Action": "logs:CreateLogGroup",
+                  "Resource": "arn:aws:logs:*:*:*"
+                }
+              ]
+            },
+            "PolicyName": {
+              "Fn::Join": [
+                "-",
+                [
+                  "edw",
+                  "policy",
+                  "matillion",
+                  {
+                    "Ref": "Environment"
+                  },
+                  {
+                    "Ref": "EnvironmentTypeIndex"
+                  }
+                ]
+              ]
+            }
+          }
+        ]
+      },
+      "Type": "AWS::IAM::Role"
+    }
+  }
+}

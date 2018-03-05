@@ -1,0 +1,279 @@
+{
+	"AWSTemplateFormatVersion": "2010-09-09",
+	"Description": "One EDW CloudFormation to rule them all",
+	"Parameters": {
+		"KMSS3Key": {
+			"Description": "The key for S3",
+			"Type": "String"
+		},
+		"KMSRedshiftKey": {
+			"Description": "The key for Redshift",
+			"Type": "String"
+		},
+		"KMSDynamoDBKey": {
+			"Description": "The key for DynamoDB",
+			"Type": "String"
+		},
+		"VPC": {
+			"Description": "VPC to launch in",
+			"Type": "AWS::EC2::VPC::Id"
+		},
+		"SubnetId": {
+			"Description": "Subnet to launch in",
+			"Type" : "List<AWS::EC2::Subnet::Id>"
+		},
+		"LoggingBucket": {
+			"Description": "S3 logging bucket",
+			"Type": "String",
+			"Default": "enterpriseeventlogging"
+		},
+		"EDWBucket": {
+			"Description": "S3 bucket",
+			"Type": "String",
+			"MinLength" : "8",
+			"MaxLength" : "60",
+			"AllowedPattern" : "^[a-z][a-z0-9\\-]*[a-z0-9]$"
+		},
+		"KeyPair": {
+			"Description": "The selected key pair will be added to the set of keys authorized for this instance",
+			"Type": "AWS::EC2::KeyPair::KeyName"
+		},
+		"METLSecurityGroup": {
+			"Description": "The Security Group to associated with the Matillion instance(s). It should have at least 80 or 443 available, plus 22 for SSH and 5901 for clustering.",
+            "Type": "String"
+		},
+		"Environment": {
+			"Description": "Type of environment you are creating",
+			"Type": "String",
+			"AllowedValues" : ["dev", "test", "prod"],
+			"Default": "dev"
+		},
+		"EnvironmentTypeIndex": {
+            "Default": "01",
+            "Description": "Index integer of envrionment type to distinguish between multiple environments within accounts. I.e. the '01', and '02' in dev-01, dev-02, test-01",
+            "Type": "String"
+        },
+		"RealmConName": {
+			"Description": "Connection Name, Example: administrator@INTERNAL.DOMAIN.COM",
+			"Type": "String",
+			"Default": "svcLDAPQuery@CORPLAN.fa.gov"
+		},
+		"RealmConPass": {
+			"Description": "The password for the connection username used for initial bind.",
+			"NoEcho": true,
+            "AllowedPattern": "([a-z]|[A-Z]|[0-9]|\\-|_)+",
+			"Type": "String"
+		},
+		"RealmConURL": {
+			"Description": "The URL to your directory server, Example: ldap://10.10.10.254:389",
+			"Type": "String",
+			"Default": "ldap://209.74.199.50:389"
+		},
+		"RealmMETLAPIRole": {
+			"Description": "The name of an existing group in the directory server whose users will be allowed to administer Matillion. Role names are case-sensitive.",
+			"Type": "String",
+			"Default": "G-S-FCA-AWS-Matillion-Api"
+		},
+		"RealmMETLAdminRole": {
+			"Description": "The name of an existing group in the directory server whose users will be allowed to administer Matillion. Role names are case-sensitive.",
+			"Type": "String",
+			"Default": "G-S-FCA-AWS-Matillion-Admin"
+		},
+		"RealmMETLRole": {
+			"Description": "The name of an existing group in the directory server whose users will be allowed to login. Role names are case-sensitive.",
+			"Type": "String",
+			"Default": "G-S-FCA-AWS-Matillion-Logon"
+		},
+		"RealmRoleBase": {
+			"Description": "The subtree below which groups are stored in the directory tree, Example: cn=Groups,dc=INTERNAL,dc=domain,dc=com",
+			"Type": "String",
+			"Default": "OU=Global Groups,OU=FCA Groups,DC=CORPLAN,DC=fa,DC=lcl"
+		},
+		"RealmRoleName": {
+			"Description": "The LDAP attribute used to identify a group or role, Example: cn",
+			"Type": "String",
+			"Default": "cn"
+		},
+		"RealmRoleSearch": {
+			"Description": "The LDAP attribute to use to identify groups or roles, Example: member={0}",
+			"Type": "String",
+			"Default": "member={0}"
+		},
+		"RealmUserBase": {
+			"Description": "The subtree below which users are stored in the directory tree, Example: cn=Users,dc=INTERNAL,dc=domain,dc=com",
+			"Type": "String",
+			"Default": "OU=Windows 10,OU=FCA All Users,DC=CORPLAN,DC=fa,DC=lcl"
+		},
+		"RealmUserSearch": {
+			"Description": "The LDAP attribute to use for identifying users, Example: sAMAccountName={0}",
+			"Type": "String",
+			"Default": "sAMAccountName={0}"
+		},
+		"AdminUserPassword": {
+            "Default": "!Race2Win!",
+            "Description": "The password associated with the Admin user account for the redshift cluster that is being created.",
+            "NoEcho": true,
+            "Type": "String"
+        },
+        "ClusterSubnetGroupName": {
+            "AllowedPattern": "([a-z]|[0-9]|\\-|_)+",
+            "Default": "edw-subnetgroup",
+            "Description": "The name of the Cluster Subnet Group where to place your cluster when creating a Cluster in your VPC",
+            "Type": "String"
+        },
+        "SnapshotClusterIdentifier": {
+            "Default": "edw",
+            "Description": "The name of the cluster that the source snapshot was created from. This property is required if your IAM policy includes a restriction on the cluster name and the resource element specifies anything other than the wildcard character (*) for the cluster name.",
+            "Type": "String"
+        },
+        "SnapshotIdentifier": {
+            "Default": "",
+            "Description": "The name of the snapshot from which to create a new cluster.",
+            "Type": "String"
+        },
+		"VPC": {
+            "Description": "The list of VPC security groups to be associated with cluster.",
+            "Type": "AWS::EC2::VPC::Id"
+        },
+        "VPCSecurityGroups": {
+            "Description": "The list of VPC security groups to be associated with cluster.",
+            "Type": "String"
+        },
+		"DynamoTableName": {
+            "Default": "edw-orch-matillion-config",
+            "Description": "Name of the DynamoDB table",
+            "Type": "String"
+        },
+        "HashKeyName": {
+            "AllowedPattern": "([A-Z]|[a-z]|[0-9])+",
+            "ConstraintDescription": "must contain only alphanumeric characters",
+            "Default": "id",
+            "Description": "HashType PrimaryKey Name",
+            "MaxLength": "2048",
+            "MinLength": "1",
+            "Type": "String"
+        },
+        "HashKeyType": {
+            "AllowedPattern": "[S|N]",
+            "ConstraintDescription": "must be either S or N",
+            "Default": "S",
+            "Description": "HashType PrimaryKey Type",
+            "MaxLength": "1",
+            "MinLength": "1",
+            "Type": "String"
+        },
+        "QueueName": {
+            "Default": "edw_orch_matillion",
+            "Description": "Name of the queue",
+            "Type": "String"
+        },
+        "ReadCapacityUnits": {
+            "ConstraintDescription": "should be between 5 and 10000",
+            "Default": "5",
+            "Description": "Provisioned read throughput",
+            "MaxValue": "10000",
+            "MinValue": "5",
+            "Type": "Number"
+        },
+        "WriteCapacityUnits": {
+            "ConstraintDescription": "should be between 5 and 10000",
+            "Default": "5",
+            "Description": "Provisioned write throughput",
+            "MaxValue": "10000",
+            "MinValue": "5",
+            "Type": "Number"
+        }
+	},
+	"Resources": {
+		"EC2Stack": {
+			"Type" : "AWS::CloudFormation::Stack",
+			"Properties" : {
+				"Parameters" : {
+					"KeyPair": {"Ref": "KeyPair"},
+					"SubnetId": {"Fn::Join": [
+                        ",",
+                        {
+                            "Ref": "SubnetId"
+                        }
+                    ]},
+					"Environment": {"Ref": "Environment"},
+					"EnvironmentTypeIndex": {"Ref": "EnvironmentTypeIndex"},
+					"RealmConName": {"Ref": "RealmConName"},
+					"RealmConPass": {"Ref": "RealmConPass"},
+					"RealmConURL": {"Ref": "RealmConURL"},
+					"RealmRoleBase": {"Ref": "RealmRoleBase"},
+					"RealmRoleName": {"Ref": "RealmRoleName"},
+					"RealmRoleSearch": {"Ref": "RealmRoleSearch"},
+					"RealmUserBase": {"Ref": "RealmUserBase"},
+					"RealmUserSearch": {"Ref": "RealmUserSearch"},
+					"RealmMETLRole": {"Ref": "RealmMETLRole"},
+					"RealmMETLAdminRole": {"Ref": "RealmMETLAdminRole"},
+					"RealmMETLAPIRole": {"Ref": "RealmMETLAPIRole"},
+					"KMSS3Key": {"Ref": "KMSS3Key"},
+					"VPC": {"Ref": "VPC"},
+					"EDWBucket": {"Fn::Sub": "arn:aws:s3:::${EDWBucket}-${Environment}-${EnvironmentTypeIndex}"}
+					},
+				"TemplateURL" : "https://s3-us-west-2.amazonaws.com/edw-cft-test/MatillionSingleNodeDeployment/Template_Matillion_EC2.json",
+				"TimeoutInMinutes" : "5"
+			}
+		},
+		"S3Stack": {
+			"Type" : "AWS::CloudFormation::Stack",
+			"Properties" : {
+				"TemplateURL" : "https://s3-us-west-2.amazonaws.com/edw-cft-test/S3Buckets/S3-Bucket-Encrypted.json",
+				"TimeoutInMinutes" : "5",
+				"Parameters": {
+					"Environment": {"Ref": "Environment"},
+					"EnvironmentTypeIndex": {"Ref": "EnvironmentTypeIndex"},
+					"KMSS3Key": {"Ref": "KMSS3Key"},
+					"LoggingBucket": {"Ref": "LoggingBucket"},
+					"EDWBucket": {"Fn::Sub": "${EDWBucket}-${Environment}-${EnvironmentTypeIndex}"}
+				}
+			}
+		},
+		"SNSStack": {
+			"Type" : "AWS::CloudFormation::Stack",
+			"Properties" : {
+				"TemplateURL" : "https://s3-us-west-2.amazonaws.com/edw-cft-test/SolutionOrchestration/Template-SnsForMatillion.json",
+				"TimeoutInMinutes" : "5",
+				"Parameters": {
+					"Environment": {"Ref": "Environment"},
+					"EnvironmentTypeIndex": {"Ref": "EnvironmentTypeIndex"},
+					"HashKeyName": {"Ref": "HashKeyName"},
+					"HashKeyType": {"Ref": "HashKeyType"},
+					"ReadCapacityUnits": {"Ref": "ReadCapacityUnits"},
+					"WriteCapacityUnits": {"Ref": "WriteCapacityUnits"}
+				}
+			}
+		},
+		"RedshiftStack": {
+			"Type" : "AWS::CloudFormation::Stack",
+			"Properties" : {
+				"TemplateURL" : "https://s3-us-west-2.amazonaws.com/edw-cft-test/RedshiftClusterDeployment/Template-Edw_Redshift.json",
+				"TimeoutInMinutes" : "",
+				"Parameters": {
+					"VPCSecurityGroups": {"Ref": "VPCSecurityGroups"},			
+					"Environment": {"Ref": "Environment"},
+					"EnvironmentTypeIndex": {"Ref": "EnvironmentTypeIndex"},
+					"KMSS3Key": {"Ref": "KMSS3Key"},
+					"SnapshotClusterIdentifier": {"Ref": "SnapshotClusterIdentifier"},
+					"EDWBucket": {"Fn::Sub": "${EDWBucket}-${Environment}-${EnvironmentTypeIndex}"},
+					"AdminUserPassword": {"Ref": "AdminUserPassword"},
+					"KMSRedshiftKey": {"Ref" : "KMSRedshiftKey"},
+					"SnapshotIdentifier": {"Ref": "SnapshotIdentifier"},
+					"ClusterSubnetGroupName": {"Ref": "ClusterSubnetGroupName"}
+				}
+			}
+		}
+	},
+	"Outputs": {
+		"InstanceId": {
+			"Value": {"Fn::GetAtt" : ["EC2Stack", "Outputs.Ec2Instance0id"]},
+			"Description": "ID of virtual server"
+		},
+		"PrivateIPAddress": {
+			"Value": {"Fn::GetAtt" : ["EC2Stack", "Outputs.Ec2Instance0PrivateEndpoint"]},
+			"Description": "IP address of Matillion server"
+		}
+	}
+}

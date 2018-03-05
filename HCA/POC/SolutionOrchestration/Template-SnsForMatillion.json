@@ -1,0 +1,843 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Creates a queue that will trigger Matillion SQL Jobs",
+    "Parameters": {
+        "Environment": {
+            "AllowedValues": [
+                "dev",
+                "test",
+                "prod"
+            ],
+            "Default": "dev",
+            "Description": "Type of Environment Deploying into",
+            "Type": "String"
+        },
+        "EnvironmentTypeIndex": {
+            "Default": "01",
+            "Description": "Type of Environment Deploying into",
+            "Type": "String"
+        },
+        "HashKeyName": {
+            "Default": "jobId",
+            "Description": "HashType PrimaryKey Name",
+            "Type": "String"
+        },
+        "HashKeyType": {
+            "AllowedPattern": "[S|N]",
+            "ConstraintDescription": "must be either S or N",
+            "Default": "S",
+            "Description": "HashType PrimaryKey Type",
+            "MaxLength": "1",
+            "MinLength": "1",
+            "Type": "String"
+        },
+        "ReadCapacityUnits": {
+            "ConstraintDescription": "should be between 5 and 10000",
+            "Default": "5",
+            "Description": "Provisioned read throughput",
+            "MaxValue": "10000",
+            "MinValue": "5",
+            "Type": "Number"
+        },
+        "WriteCapacityUnits": {
+            "ConstraintDescription": "should be between 5 and 10000",
+            "Default": "5",
+            "Description": "Provisioned write throughput",
+            "MaxValue": "10000",
+            "MinValue": "5",
+            "Type": "Number"
+        }
+    },
+    "Resources": {
+        "DynamoTable": {
+            "Properties": {
+                "AttributeDefinitions": [
+                    {
+                        "AttributeName": {
+                            "Ref": "HashKeyName"
+                        },
+                        "AttributeType": {
+                            "Ref": "HashKeyType"
+                        }
+                    }
+                ],
+                "KeySchema": [
+                    {
+                        "AttributeName": {
+                            "Ref": "HashKeyName"
+                        },
+                        "KeyType": "HASH"
+                    }
+                ],
+                "ProvisionedThroughput": {
+                    "ReadCapacityUnits": {
+                        "Ref": "ReadCapacityUnits"
+                    },
+                    "WriteCapacityUnits": {
+                        "Ref": "WriteCapacityUnits"
+                    }
+                },
+                "TableName": {
+                    "Fn::Join": [
+                        "-",
+                        [
+                            "edw",
+                            "config",
+                            "table",
+                            {
+                                "Ref": "Environment"
+                            },
+                            {
+                                "Ref": "EnvironmentTypeIndex"
+                            }
+                        ]
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Application",
+                        "Value": "Enterprise Data Warehouse POC"
+                    },
+                    {
+                        "Key": "Category",
+                        "Value": "2"
+                    },
+                    {
+                        "Key": "Environment",
+                        "Value": {
+                            "Ref": "Environment"
+                        }
+                    },
+                    {
+                        "Key": "HIPPA",
+                        "Value": "No"
+                    },
+                    {
+                        "Key": "Project",
+                        "Value": "EDW"
+                    },
+                    {
+                        "Key": "Team",
+                        "Value": "EDMS"
+                    }
+                ]
+            },
+            "Type": "AWS::DynamoDB::Table"
+        },
+        "LambdaEventBroker": {
+            "Properties": {
+                "Code": {
+                    "ZipFile": {
+                        "Fn::Join": [
+                            "",
+                            [
+                                "###this is the lambda function that will be triggered after the completion of the SSIS package that loads data into S3\n",
+                                "###Created by Slalom LLC, 2/18/2018\n",
+                                "import os, re, json, boto3, time\n",
+                                "from boto3.dynamodb.conditions import Key, Attr\n",
+                                "from httplib import HTTPException\n",
+                                "\n",
+                                "DISABLE_DEDUPING=True\n",
+                                "\n",
+                                "def lambda_handler(event, context):\n",
+                                "    message = json.loads(event['Records'][0]['Sns']['Message'])\n",
+                                "    DYNAMO_TABLE = os.environ['TABLE_NAME']\n",
+                                "    jobId = message[os.environ['TABLE_PRIMARY_KEY']]\n",
+                                "    #Get message from SNS\n",
+                                "    print 'Json Message from Event Argument'\n",
+                                "    print json.dumps(json.dumps(message, indent=4, sort_keys=True))\n",
+                                "    #Lookup variables from DynamoDb Table for Job in messages\n",
+                                "    dynamodb_client = boto3.client('dynamodb')\n",
+                                "    config = dynamodb_client.get_item(\n",
+                                "        TableName=DYNAMO_TABLE,\n",
+                                "        Key={\n",
+                                "            'jobId': {'S': jobId}\n",
+                                "            }\n",
+                                "    )\n",
+                                "    #Get Configuration Details for Job\n",
+                                "    try:\n",
+                                "        jobConfiguration = config['Item']\n",
+                                "    except KeyError:\n",
+                                "        raise ValueError(\"DynamoDB Table Key '{}' not found in table '{}'\".format(jobId,DYNAMO_TABLE))\n",
+                                "\n",
+                                "    #Handle Job Type\n",
+                                "    if jobConfiguration['jobType']['S']=='MatillionQueue':\n",
+                                "        #Get Specific Deatalls for MatillionQueue Job Type\n",
+                                "        sqs_client = boto3.client('sqs')\n",
+                                "\n",
+                                "        #Build Matillion Message\n",
+                                "        sqsMsg = jobConfiguration['config']['M']['matillionSqsMessage']['M']\n",
+                                "\n",
+                                "        #Iterate through keys in message that are required for Matillion Queue\n",
+                                "        metl_msg_keys = ['group','environment','project','job','version']\n",
+                                "        metl_message = {\n",
+                                "            key:returnPythonValue(val)\n",
+                                "            for key, val in sqsMsg.items()\n",
+                                "            if key in metl_msg_keys\n",
+                                "        }\n",
+                                "\n",
+                                "        if 'variables' in sqsMsg:\n",
+                                "            #Parse through variables if they exist.\n",
+                                "            if DISABLE_DEDUPING:\n",
+                                "                jobId = int(time.time())\n",
+                                "            metl_message['variables'] = {\n",
+                                "                key:returnPythonValue(val)\n",
+                                "                for key, val in sqsMsg['variables']['M'].items()\n",
+                                "            }\n",
+                                "            metl_message['variables']['lambdaId']=jobId\n",
+                                "\n",
+                                "        print \"Submitting Message\\n\", metl_message\n",
+                                "        #Publish message to Sqs\n",
+                                "        queueUrl = jobConfiguration['config']['M']['queueUrl']['S']\n",
+                                "        print \"Sns Url\\t\",queueUrl\n",
+                                "        sqs_response = sqs_client.send_message(\n",
+                                "            QueueUrl=queueUrl,\n",
+                                "            MessageBody=json.dumps(metl_message),\n",
+                                "            MessageGroupId=jobConfiguration['config']['M']['sqsMessageGroupId']['S']\n",
+                                "        )\n",
+                                "        if sqs_response['ResponseMetadata']['HTTPStatusCode']!=200:\n",
+                                "            raise HTTPException(\n",
+                                "                \"Lambda failed to publish to SQS queue '{}' with response: {}\".format(\n",
+                                "                queueUrl,\n",
+                                "                repsonse)\n",
+                                "            )\n",
+                                "            #sns_client('sns').publish\n",
+                                "\n",
+                                "    elif jobConfiguration['jobType']=='EMR':\n",
+                                "        #Handle EMR Job\n",
+                                "        pass\n",
+                                "    else:\n",
+                                "        raise ValueError(\"Job type '{}' not supported\".format(jobConfiguration['jobType']['S']))\n",
+                                "\n",
+                                "def returnPythonValue(dct):\n",
+                                "    try:\n",
+                                "        if 'BOOL' in dct:\n",
+                                "            return dct['BOOL']\n",
+                                "        if 'S' in dct:\n",
+                                "            val = dct['S']\n",
+                                "            try:\n",
+                                "                return datetime.strptime(val, '%Y-%m-%dT%H:%M:%S.%f')\n",
+                                "            except:\n",
+                                "                return str(val)\n",
+                                "        if 'SS' in dct:\n",
+                                "            return list(dct['SS'])\n",
+                                "        if 'N' in dct:\n",
+                                "            if re.match(\"^-?\\d+?\\.\\d+?$\", dct['N']) is not None:\n",
+                                "                return float(dct['N'])\n",
+                                "            else:\n",
+                                "                try:\n",
+                                "                    return int(dct['N'])\n",
+                                "                except:\n",
+                                "                    return int(dct['N'])\n",
+                                "        if 'B' in dct:\n",
+                                "            return str(dct['B'])\n",
+                                "        if 'NS' in dct:\n",
+                                "            return set(dct['NS'])\n",
+                                "        if 'BS' in dct:\n",
+                                "            return set(dct['BS'])\n",
+                                "        if 'M' in dct:\n",
+                                "            return dct['M']\n",
+                                "        if 'L' in dct:\n",
+                                "            return dct['L']\n",
+                                "        if 'NULL' in dct and dct['NULL'] is True:\n",
+                                "            return None\n",
+                                "    except:\n",
+                                "        return dct\n"
+                            ]
+                        ]
+                    }
+                },
+                "Description": "Manages SNS messages and executes necessary actions for FCA Cloud Data Warehouse POC",
+                "Environment": {
+                    "Variables": {
+                        "TABLE_NAME": {
+                            "Ref": "DynamoTable"
+                        },
+                        "TABLE_PRIMARY_KEY": {
+                            "Ref": "HashKeyName"
+                        }
+                    }
+                },
+                "FunctionName": {
+                    "Fn::Join": [
+                        "-",
+                        [
+                            "edw",
+                            "broker",
+                            "function",
+                            {
+                                "Ref": "Environment"
+                            },
+                            {
+                                "Ref": "EnvironmentTypeIndex"
+                            }
+                        ]
+                    ]
+                },
+                "Handler": "index.lambda_handler",
+                "Role": {
+                    "Fn::GetAtt": [
+                        "iamLambdaBrokerRole",
+                        "Arn"
+                    ]
+                },
+                "Runtime": "python2.7",
+                "Tags": [
+                    {
+                        "Key": "Application",
+                        "Value": "Enterprise Data Warehouse POC"
+                    },
+                    {
+                        "Key": "Category",
+                        "Value": "2"
+                    },
+                    {
+                        "Key": "Environment",
+                        "Value": {
+							"Fn::Sub": "${Environment}-${EnvironmentTypeIndex}"
+                        }
+                    },
+                    {
+                        "Key": "HIPPA",
+                        "Value": "No"
+                    },
+                    {
+                        "Key": "Project",
+                        "Value": "EDW"
+                    },
+                    {
+                        "Key": "Team",
+                        "Value": "EDMS"
+                    }
+                ],
+                "Timeout": 60
+            },
+            "Type": "AWS::Lambda::Function"
+        },
+        "LambdaRedshiftSnapshotIamRole": {
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Statement": [
+                        {
+                            "Action": "sts:AssumeRole",
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "lambda.amazonaws.com"
+                            }
+                        }
+                    ],
+                    "Version": "2012-10-17"
+                },
+                "Policies": [
+                    {
+                        "PolicyDocument": {
+                            "Statement": [
+                                {
+                                    "Action": [
+                                        "redshift:CreateSnapshot"
+                                    ],
+                                    "Effect": "Allow",
+                                    "Resource": [
+                                        "*"
+                                    ],
+                                    "Sid": "VisualEditor0"
+                                }
+                            ],
+                            "Version": "2012-10-17"
+                        },
+                        "PolicyName": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    "edw",
+                                    "lambda",
+                                    "redshift",
+                                    "snapshot",
+                                    "policy",
+                                    {
+                                        "Ref": "Environment"
+                                    },
+                                    {
+                                        "Ref": "EnvironmentTypeIndex"
+                                    }
+                                ]
+                            ]
+                        }
+                    }
+                ],
+                "RoleName": {
+                    "Fn::Join": [
+                        "-",
+                        [
+                            {
+                                "Ref": "AWS::Region"
+                            },
+                            {
+                                "Fn::Join": [
+                                    "-",
+                                    [
+                                        "edw",
+                                        "lambda",
+                                        "redshift",
+                                        "snapshot",
+                                        "role",
+                                        {
+                                            "Ref": "Environment"
+                                        },
+                                        {
+                                            "Ref": "EnvironmentTypeIndex"
+                                        }
+                                    ]
+                                ]
+                            }
+                        ]
+                    ]
+                }
+            },
+            "Type": "AWS::IAM::Role"
+        },
+        "Sns": {
+            "Properties": {
+                "ContentBasedDeduplication": true,
+                "DelaySeconds": 1,
+                "FifoQueue": true,
+                "QueueName": {
+                    "Fn::Join": [
+                        "-",
+                        [
+                            "edw",
+                            "orch",
+                            "metl",
+                            {
+                                "Ref": "Environment"
+                            },
+                            {
+                                "Ref": "EnvironmentTypeIndex"
+                            },
+                            "queue.fifo"
+                        ]
+                    ]
+                }
+            },
+            "Type": "AWS::SQS::Queue"
+        },
+        "iamLambdaBrokerRole": {
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Statement": [
+                        {
+                            "Action": "sts:AssumeRole",
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "lambda.amazonaws.com"
+                            }
+                        }
+                    ],
+                    "Version": "2012-10-17"
+                },
+                "Policies": [
+                    {
+                        "PolicyDocument": {
+                            "Statement": [
+                                {
+                                    "Action": [
+                                        "dynamodb:BatchGetItem",
+                                        "dynamodb:DescribeTable",
+                                        "dynamodb:GetShardIterator",
+                                        "dynamodb:GetItem",
+                                        "sqs:SendMessage",
+                                        "dynamodb:DescribeContinuousBackups",
+                                        "dynamodb:Scan",
+                                        "dynamodb:DescribeStream",
+                                        "dynamodb:Query",
+                                        "dynamodb:DescribeBackup",
+                                        "dynamodb:GetRecords"
+                                    ],
+                                    "Effect": "Allow",
+                                    "Resource": [
+                                        {
+                                            "Fn::GetAtt": [
+                                                "DynamoTable",
+                                                "Arn"
+                                            ]
+                                        },
+                                        {
+                                            "Fn::GetAtt": [
+                                                "Sns",
+                                                "Arn"
+                                            ]
+                                        }
+                                    ],
+                                    "Sid": "VisualEditor0"
+                                },
+                                {
+                                    "Action": [
+                                        "logs:CreateLogGroup",
+                                        "logs:CreateLogStream",
+                                        "logs:PutLogEvents"
+                                    ],
+                                    "Effect": "Allow",
+                                    "Resource": "arn:aws:logs:*:*:*"
+                                },
+                                {
+                                    "Action": [
+                                        "dynamodb:DescribeReservedCapacityOfferings",
+                                        "dynamodb:DescribeReservedCapacity",
+                                        "dynamodb:ListTagsOfResource",
+                                        "dynamodb:DescribeTimeToLive",
+                                        "dynamodb:DescribeLimits",
+                                        "dynamodb:ListStreams"
+                                    ],
+                                    "Effect": "Allow",
+                                    "Resource": "*",
+                                    "Sid": "VisualEditor1"
+                                }
+                            ],
+                            "Version": "2012-10-17"
+                        },
+                        "PolicyName": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    "edw",
+                                    "orch",
+                                    "lambda",
+                                    "broker",
+                                    "policy"
+                                ]
+                            ]
+                        }
+                    }
+                ],
+                "RoleName": {
+                    "Fn::Join": [
+                        "-",
+                        [
+                            {
+                                "Ref": "AWS::Region"
+                            },
+                            {
+                                "Fn::Join": [
+                                    "-",
+                                    [
+                                        "edw",
+                                        "lambda",
+                                        "broker",
+                                        "policy",
+                                        {
+                                            "Ref": "Environment"
+                                        },
+                                        {
+                                            "Ref": "EnvironmentTypeIndex"
+                                        }
+                                    ]
+                                ]
+                            }
+                        ]
+                    ]
+                }
+            },
+            "Type": "AWS::IAM::Role"
+        },
+        "lambdaPermissionSnsBroker": {
+            "Properties": {
+                "Action": "lambda:InvokeFunction",
+                "FunctionName": {
+                    "Fn::GetAtt": [
+                        "LambdaEventBroker",
+                        "Arn"
+                    ]
+                },
+                "Principal": "sns.amazonaws.com",
+                "SourceArn": {
+                    "Ref": "snsTopicEdwEvent"
+                }
+            },
+            "Type": "AWS::Lambda::Permission"
+        },
+        "lambdaPermissionSnsSnapshot": {
+            "Properties": {
+                "Action": "lambda:InvokeFunction",
+                "FunctionName": {
+                    "Fn::GetAtt": [
+                        "lambdaRedshiftSnapshot",
+                        "Arn"
+                    ]
+                },
+                "Principal": "sns.amazonaws.com",
+                "SourceArn": {
+                    "Ref": "snsTopicRedshiftSnapshot"
+                }
+            },
+            "Type": "AWS::Lambda::Permission"
+        },
+        "lambdaRedshiftSnapshot": {
+            "Properties": {
+                "Code": {
+                    "ZipFile": {
+                        "Fn::Join": [
+                            "",
+                            [
+                                "###this is the lambda function that will be triggered after the completion of the SSIS package that loads data into S3\n",
+                                "###Created by Slalom LLC, 2/18/2018\n",
+                                "import os, re, json, boto3, time\n",
+                                "from boto3.dynamodb.conditions import Key, Attr\n",
+                                "from httplib import HTTPException\n",
+                                "\n",
+                                "DISABLE_DEDUPING=True\n",
+                                "\n",
+                                "def lambda_handler(event, context):\n",
+                                "    message = json.loads(event['Records'][0]['Sns']['Message'])\n",
+                                "    DYNAMO_TABLE = os.environ['TABLE_NAME']\n",
+                                "    jobId = message[os.environ['TABLE_PRIMARY_KEY']]\n",
+                                "    #Get message from SNS\n",
+                                "    print 'Json Message from Event Argument'\n",
+                                "    print json.dumps(json.dumps(message, indent=4, sort_keys=True))\n",
+                                "    #Lookup variables from DynamoDb Table for Job in messages\n",
+                                "    dynamodb_client = boto3.client('dynamodb')\n",
+                                "    config = dynamodb_client.get_item(\n",
+                                "        TableName=DYNAMO_TABLE,\n",
+                                "        Key={\n",
+                                "            'jobId': {'S': jobId}\n",
+                                "            }\n",
+                                "    )\n",
+                                "    #Get Configuration Details for Job\n",
+                                "    try:\n",
+                                "        jobConfiguration = config['Item']\n",
+                                "    except KeyError:\n",
+                                "        raise ValueError(\"DynamoDB Table Key '{}' not found in table '{}'\".format(jobId,DYNAMO_TABLE))\n",
+                                "\n",
+                                "    #Handle Job Type\n",
+                                "    if jobConfiguration['jobType']['S']=='MatillionQueue':\n",
+                                "        #Get Specific Deatalls for MatillionQueue Job Type\n",
+                                "        sqs_client = boto3.client('sqs')\n",
+                                "\n",
+                                "        #Build Matillion Message\n",
+                                "        sqsMsg = jobConfiguration['config']['M']['matillionSqsMessage']['M']\n",
+                                "\n",
+                                "        #Iterate through keys in message that are required for Matillion Queue\n",
+                                "        metl_msg_keys = ['group','environment','project','job','version']\n",
+                                "        metl_message = {\n",
+                                "            key:returnPythonValue(val)\n",
+                                "            for key, val in sqsMsg.items()\n",
+                                "            if key in metl_msg_keys\n",
+                                "        }\n",
+                                "\n",
+                                "        if 'variables' in sqsMsg:\n",
+                                "            #Parse through variables if they exist.\n",
+                                "            if DISABLE_DEDUPING:\n",
+                                "                jobId = int(time.time())\n",
+                                "            metl_message['variables'] = {\n",
+                                "                key:returnPythonValue(val)\n",
+                                "                for key, val in sqsMsg['variables']['M'].items()\n",
+                                "            }\n",
+                                "            metl_message['variables']['lambdaId']=jobId\n",
+                                "\n",
+                                "        print \"Submitting Message\\n\", metl_message\n",
+                                "        #Publish message to Sqs\n",
+                                "        queueUrl = jobConfiguration['config']['M']['queueUrl']['S']\n",
+                                "        print \"Sns Url\\t\",queueUrl\n",
+                                "        sqs_response = sqs_client.send_message(\n",
+                                "            QueueUrl=queueUrl,\n",
+                                "            MessageBody=json.dumps(metl_message),\n",
+                                "            MessageGroupId=jobConfiguration['config']['M']['sqsMessageGroupId']['S']\n",
+                                "        )\n",
+                                "        if sqs_response['ResponseMetadata']['HTTPStatusCode']!=200:\n",
+                                "            raise HTTPException(\n",
+                                "                \"Lambda failed to publish to SQS queue '{}' with response: {}\".format(\n",
+                                "                queueUrl,\n",
+                                "                repsonse)\n",
+                                "            )\n",
+                                "            #sns_client('sns').publish\n",
+                                "\n",
+                                "    elif jobConfiguration['jobType']=='EMR':\n",
+                                "        #Handle EMR Job\n",
+                                "        pass\n",
+                                "    else:\n",
+                                "        raise ValueError(\"Job type '{}' not supported\".format(jobConfiguration['jobType']['S']))\n",
+                                "\n",
+                                "def returnPythonValue(dct):\n",
+                                "    try:\n",
+                                "        if 'BOOL' in dct:\n",
+                                "            return dct['BOOL']\n",
+                                "        if 'S' in dct:\n",
+                                "            val = dct['S']\n",
+                                "            try:\n",
+                                "                return datetime.strptime(val, '%Y-%m-%dT%H:%M:%S.%f')\n",
+                                "            except:\n",
+                                "                return str(val)\n",
+                                "        if 'SS' in dct:\n",
+                                "            return list(dct['SS'])\n",
+                                "        if 'N' in dct:\n",
+                                "            if re.match(\"^-?\\d+?\\.\\d+?$\", dct['N']) is not None:\n",
+                                "                return float(dct['N'])\n",
+                                "            else:\n",
+                                "                try:\n",
+                                "                    return int(dct['N'])\n",
+                                "                except:\n",
+                                "                    return int(dct['N'])\n",
+                                "        if 'B' in dct:\n",
+                                "            return str(dct['B'])\n",
+                                "        if 'NS' in dct:\n",
+                                "            return set(dct['NS'])\n",
+                                "        if 'BS' in dct:\n",
+                                "            return set(dct['BS'])\n",
+                                "        if 'M' in dct:\n",
+                                "            return dct['M']\n",
+                                "        if 'L' in dct:\n",
+                                "            return dct['L']\n",
+                                "        if 'NULL' in dct and dct['NULL'] is True:\n",
+                                "            return None\n",
+                                "    except:\n",
+                                "        return dct\n"
+                            ]
+                        ]
+                    }
+                },
+                "Description": "Given a ClusterIdentifier, Lambda function will take a manual snapshot.",
+                "FunctionName": {
+                    "Fn::Join": [
+                        "-",
+                        [
+                            "edw",
+                            "redshift",
+                            "snapshot",
+                            "function",
+                            {
+                                "Ref": "Environment"
+                            },
+                            {
+                                "Ref": "EnvironmentTypeIndex"
+                            }
+                        ]
+                    ]
+                },
+                "Handler": "index.lambda_handler",
+                "Role": {
+                    "Fn::GetAtt": [
+                        "LambdaRedshiftSnapshotIamRole",
+                        "Arn"
+                    ]
+                },
+                "Runtime": "python2.7",
+                "Tags": [
+                    {
+                        "Key": "Application",
+                        "Value": "Enterprise Data Warehouse POC"
+                    },
+                    {
+                        "Key": "Category",
+                        "Value": "2"
+                    },
+                    {
+                        "Key": "Environment",
+                        "Value": {
+							"Fn::Sub": "${Environment}-${EnvironmentTypeIndex}"
+                        }
+                    },
+                    {
+                        "Key": "HIPPA",
+                        "Value": "No"
+                    },
+                    {
+                        "Key": "Project",
+                        "Value": "EDW"
+                    },
+                    {
+                        "Key": "Team",
+                        "Value": "EDMS"
+                    }
+                ],
+                "Timeout": 60
+            },
+            "Type": "AWS::Lambda::Function"
+        },
+        "snsTaskComplete": {
+            "Properties": {
+                "DisplayName": "edw-task-complete",
+                "TopicName": {
+                    "Fn::Join": [
+                        "-",
+                        [
+                            "edw",
+                            "task",
+                            "complete",
+                            {
+                                "Ref": "Environment"
+                            },
+                            {
+                                "Ref": "EnvironmentTypeIndex"
+                            }
+                        ]
+                    ]
+                }
+            },
+            "Type": "AWS::SNS::Topic"
+        },
+        "snsTopicEdwEvent": {
+            "Properties": {
+                "DisplayName": "edw-event-topic",
+                "Subscription": [
+                    {
+                        "Endpoint": {
+                            "Fn::GetAtt": [
+                                "LambdaEventBroker",
+                                "Arn"
+                            ]
+                        },
+                        "Protocol": "lambda"
+                    }
+                ],
+                "TopicName": {
+                    "Fn::Join": [
+                        "-",
+                        [
+                            "edw",
+                            "event",
+                            {
+                                "Ref": "Environment"
+                            },
+                            {
+                                "Ref": "EnvironmentTypeIndex"
+                            }
+                        ]
+                    ]
+                }
+            },
+            "Type": "AWS::SNS::Topic"
+        },
+        "snsTopicRedshiftSnapshot": {
+            "Properties": {
+                "DisplayName": "edw-take-snapshot",
+                "Subscription": [
+                    {
+                        "Endpoint": {
+                            "Fn::GetAtt": [
+                                "lambdaRedshiftSnapshot",
+                                "Arn"
+                            ]
+                        },
+                        "Protocol": "lambda"
+                    }
+                ],
+                "TopicName": {
+                    "Fn::Join": [
+                        "-",
+                        [
+                            "edw",
+                            "take",
+                            "snapshot",
+                            {
+                                "Ref": "Environment"
+                            },
+                            {
+                                "Ref": "EnvironmentTypeIndex"
+                            }
+                        ]
+                    ]
+                }
+            },
+            "Type": "AWS::SNS::Topic"
+        }
+    }
+}

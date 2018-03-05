@@ -1,0 +1,19 @@
+{
+  "config": {
+    "matillionSqsMessage": {
+      "environment": "edw_medicaid",
+      "group": "EDMS EDW POC",
+      "job": "Run Edw Refresh",
+      "project": "Dimensional Models",
+      "variables": {
+        "table_name": "CLM_HDR_PROCEDURE_L"
+      },
+      "version": "default"
+    },
+    "queueUrl": "https://sqs.us-west-2.amazonaws.com/123456789012/edw-orch-metl-dev-02-queue.fifo",
+    "sqsArn": "arn:aws:sqs:us-west-2:123456789012:edw-orch-metl-dev-02-queue.fifo",
+    "sqsMessageGroupId": "testForChris"
+  },
+  "jobId": "EDW_MODEL_REFRESH",
+  "jobType": "MatillionQueue"
+}

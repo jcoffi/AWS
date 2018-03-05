@@ -1,0 +1,76 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "VisualEditor0",
+            "Effect": "Allow",
+            "Action": "s3:Get*",
+            "Resource": "arn:aws:s3:::fca-edw-data-dev/landing/*"
+        },
+        {
+            "Sid": "VisualEditor1",
+            "Effect": "Allow",
+            "Action": [
+                "s3:Get*",
+                "s3:Put*"
+            ],
+            "Resource": "arn:aws:s3:::fca-edw-data-dev/ods/*"
+        },
+        {
+            "Sid": "VisualEditor2",
+            "Effect": "Allow",
+            "Action": [
+                "glue:GetConnections",
+                "glue:GetCrawler",
+                "glue:GetCrawlers",
+                "glue:GetClassifiers",
+                "glue:DeleteDatabase",
+                "glue:GetTableVersions",
+                "glue:GetPartitions",
+                "glue:DeleteTable",
+                "glue:GetDevEndpoint",
+                "glue:GetCatalogImportStatus",
+                "glue:GetConnection",
+                "glue:GetTrigger",
+                "glue:GetUserDefinedFunction",
+                "glue:GetJobRun",
+                "glue:CreatePartition",
+                "glue:GetUserDefinedFunctions",
+                "glue:GetClassifier",
+                "glue:UpdatePartition",
+                "glue:UpdateDatabase",
+                "glue:CreateTable",
+                "glue:GetJobs",
+                "glue:GetTables",
+                "glue:GetTriggers",
+                "glue:BatchGetPartition",
+                "glue:GetDatabases",
+                "glue:GetTable",
+                "glue:GetDatabase",
+                "glue:GetMapping",
+                "glue:GetPartition",
+                "glue:GetDevEndpoints",
+                "glue:GetDataflowGraph",
+                "glue:CreateDatabase",
+                "glue:GetPlan",
+                "glue:GetCrawlerMetrics",
+                "glue:DeletePartition",
+                "glue:GetJob",
+                "glue:GetJobRuns"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "VisualEditor3",
+            "Effect": "Allow",
+            "Action": "s3:List*",
+            "Resource": "arn:aws:s3:::fca-edw-data-dev/landing/*"
+        },
+        {
+            "Sid": "VisualEditor4",
+            "Effect": "Allow",
+            "Action": "s3:List*",
+            "Resource": "arn:aws:s3:::fca-edw-data-dev/ods/*"
+        }
+    ]
+}

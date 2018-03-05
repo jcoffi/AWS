@@ -1,0 +1,19 @@
+{
+  "config": {
+    "matillionSqsMessage": {
+      "environment": "edw_medicaid_dev",
+      "group": "EDW POC",
+      "job": "Ingest Table",
+      "project": "File Onboarding",
+      "variables": {
+        "table_name": "CLM_HDR_PROCEDURE_L"
+      },
+      "version": "default"
+    },
+    "queueUrl": "https://sqs.us-west-2.amazonaws.com/123456789012/edw-orch-metl-dev-02-queue.fifo",
+    "sqsArn": "arn:aws:sqs:us-west-2:123456789012:edw-orch-metl-dev-02-queue.fifo",
+    "sqsMessageGroupId": "testForChris"
+  },
+  "jobId": "load_CLM_HDR_PROCEDURE_L",
+  "jobType": "MatillionQueue"
+}

@@ -1,0 +1,426 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Conditions": {
+        "IsProdCluster": {
+            "Fn::Equals": [
+                {
+                    "Ref": "Environment"
+                },
+                "prod"
+            ]
+        },
+        "IsSnapshoptRestore": {
+            "Fn::Not": [
+                {
+                    "Fn::Equals": [
+                        {
+                            "Ref": "SnapshotIdentifier"
+                        },
+                        ""
+                    ]
+                }
+            ]
+        },
+        "IsSnapshotClusterIdentifierNotEmpty": {
+            "Fn::Not": [
+                {
+                    "Fn::Equals": [
+                        {
+                            "Ref": "SnapshotClusterIdentifier"
+                        },
+                        ""
+                    ]
+                }
+            ]
+        }
+    },
+    "Description": "Deploys a Redshift Cluster for EDMS EDW Project",
+    "Outputs": {
+        "ClusterEndpoint": {
+            "Value": {
+                "Fn::GetAtt": [
+                    "RedshiftCluster",
+                    "Endpoint.Address"
+                ]
+            }
+        },
+        "ClusterEndpointPort": {
+            "Value": {
+                "Fn::Join": [
+                    "",
+                    [
+                        "jdbc:redshift://",
+                        {
+                            "Fn::GetAtt": [
+                                "RedshiftCluster",
+                                "Endpoint.Address"
+                            ]
+                        },
+                        ":",
+                        {
+                            "Fn::GetAtt": [
+                                "RedshiftCluster",
+                                "Endpoint.Port"
+                            ]
+                        }
+                    ]
+                ]
+            }
+        },
+        "RedshiftIamRole": {
+            "Value": {
+                "Fn::GetAtt": [
+                    "RedshiftIamRole",
+                    "Arn"
+                ]
+            }
+        }
+    },
+    "Parameters": {
+        "AdminUserPassword": {
+            "Default": "!Race2Win!",
+            "Description": "The password associated with the Admin user account for the redshift cluster that is being created.",
+            "NoEcho": true,
+            "Type": "String"
+        },
+        "ClusterSubnetGroupName": {
+            "AllowedPattern": "([a-z]|[0-9]|\\-|_)+",
+            "Default": "edw-subnetgroup",
+            "Description": "The name of the Cluster Subnet Group where to place your cluster when creating a Cluster in your VPC",
+            "Type": "String"
+        },
+        "EDWBucket": {
+            "Default": "arn:s3:::mybucketname",
+            "Description": "Arn of s3 bucket used for data storage.",
+            "Type": "String"
+        },
+        "Environment": {
+            "AllowedValues": [
+                "dev",
+                "test",
+                "prod"
+            ],
+            "Default": "dev",
+            "Description": "Type of Environment being deployed",
+            "Type": "String"
+        },
+        "EnvironmentTypeIndex": {
+            "Default": "01",
+            "Description": "Index integer of envrionment type to distinguish between multiple environments within accounts. I.e. the '01', and '02' in dev-01, dev-02, test-01",
+            "Type": "String"
+        },
+        "KMSRedshiftKey": {
+            "Default": "arn:aws:kms:region:account-id:key/key-id",
+            "Description": "KMS Key to Encrypt the Database with.",
+            "Type": "String"
+        },
+        "KMSS3Key": {
+            "Default": "arn:aws:kms:region:account-id:key/key-id",
+            "Description": "KMS Key to Encrypt the Database with.",
+            "Type": "String"
+        },
+        "SnapshotClusterIdentifier": {
+            "Default": "",
+            "Description": "OPTIONAL. The name of the cluster that the source snapshot was created from. This property is required if your IAM policy includes a restriction on the cluster name and the resource element specifies anything other than the wildcard character (*) for the cluster name.",
+            "Type": "String"
+        },
+        "SnapshotIdentifier": {
+            "Default": "",
+            "Description": "OPTIONAL. The name of the snapshot from which to create a new cluster.",
+            "Type": "String"
+        },
+        "VPCSecurityGroups": {
+            "Description": "The list of VPC security groups to be associated with cluster.",
+            "Type": "List<AWS::EC2::SecurityGroup::Id>"
+        }
+    },
+    "Resources": {
+        "RedshiftCluster": {
+            "Properties": {
+                "AllowVersionUpgrade": "false",
+                "AutomatedSnapshotRetentionPeriod": 1,
+                "ClusterParameterGroupName": {
+                    "Ref": "RedshiftClusterParameterGroup"
+                },
+                "ClusterSubnetGroupName": {
+                    "Ref": "ClusterSubnetGroupName"
+                },
+                "ClusterType": "multi-node",
+                "DBName": "public",
+                "Encrypted": "true",
+                "HsmClientCertificateIdentifier": {
+                    "Ref": "AWS::NoValue"
+                },
+                "HsmConfigurationIdentifier": {
+                    "Ref": "AWS::NoValue"
+                },
+                "IamRoles": [
+                    {
+                        "Fn::GetAtt": [
+                            "RedshiftIamRole",
+                            "Arn"
+                        ]
+                    }
+                ],
+                "KmsKeyId": {
+                    "Ref": "KMSRedshiftKey"
+                },
+                "MasterUserPassword": {
+                    "Ref": "AdminUserPassword"
+                },
+                "MasterUsername": "admin",
+                "NodeType": {
+                    "Fn::If": [
+                        "IsProdCluster",
+                        "dc2.8xlarge",
+                        "dc2.8xlarge"
+                    ]
+                },
+                "NumberOfNodes": {
+                    "Fn::If": [
+                        "IsProdCluster",
+                        "2",
+                        "2"
+                    ]
+                },
+                "Port": 5439,
+                "PubliclyAccessible": "false",
+                "SnapshotClusterIdentifier": {
+                    "Fn::If": [
+                        "IsSnapshotClusterIdentifierNotEmpty",
+                        {
+                            "Ref": "SnapshotClusterIdentifier"
+                        },
+                        {
+                            "Ref": "AWS::NoValue"
+                        }
+                    ]
+                },
+                "SnapshotIdentifier": {
+                    "Fn::If": [
+                        "IsSnapshoptRestore",
+                        {
+                            "Ref": "SnapshotIdentifier"
+                        },
+                        {
+                            "Ref": "AWS::NoValue"
+                        }
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Application",
+                        "Value": "Enterprise Data Warehouse POC"
+                    },
+                    {
+                        "Key": "Category",
+                        "Value": "4"
+                    },
+                    {
+                        "Key": "Environment",
+                        "Value": {
+                            "Fn::Sub": "${Environment}-${EnvironmentTypeIndex}"
+                        }
+                    },
+                    {
+                        "Key": "HIPPA",
+                        "Value": "Yes"
+                    },
+                    {
+                        "Key": "Project",
+                        "Value": "EDW"
+                    },
+                    {
+                        "Key": "Team",
+                        "Value": "EDMS"
+                    }
+                ],
+                "VpcSecurityGroupIds": {
+                    "Ref": "VPCSecurityGroups"
+                }
+            },
+            "Type": "AWS::Redshift::Cluster"
+        },
+        "RedshiftClusterParameterGroup": {
+            "Properties": {
+                "Description": "Cluster Parameter Group for EDW POC",
+                "ParameterGroupFamily": "redshift-1.0",
+                "Parameters": [
+                    {
+                        "ParameterName": "enable_user_activity_logging",
+                        "ParameterValue": "true"
+                    },
+                    {
+                        "ParameterName": "require_ssl",
+                        "ParameterValue": "true"
+                    }
+                ]
+            },
+            "Type": "AWS::Redshift::ClusterParameterGroup"
+        },
+        "RedshiftIamRole": {
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Statement": [
+                        {
+                            "Action": [
+                                "sts:AssumeRole"
+                            ],
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "redshift.amazonaws.com"
+                                ]
+                            }
+                        }
+                    ],
+                    "Version": "2012-10-17"
+                },
+                "Policies": [
+                    {
+                        "PolicyDocument": {
+                            "Statement": [
+                                {
+                                    "Action": [
+                                        "s3:Get*",
+                                        "s3:List*"
+                                    ],
+                                    "Effect": "Allow",
+                                    "Resource": [
+                                        {
+                                            "Fn::Join": [
+                                                "",
+                                                [
+                                                    "arn:aws:s3:::",
+                                                    {
+                                                        "Ref": "EDWBucket"
+                                                    },
+                                                    "/landing/*"
+                                                ]
+                                            ]
+                                        },
+                                        {
+                                            "Fn::Join": [
+                                                "",
+                                                [
+                                                    "arn:aws:s3:::",
+                                                    {
+                                                        "Ref": "EDWBucket"
+                                                    },
+                                                    "/raw/*"
+                                                ]
+                                            ]
+                                        }
+                                    ],
+                                    "Sid": "ReadOnlyAccess"
+                                },
+                                {
+                                    "Action": [
+                                        "kms:Encrypt",
+                                        "kms:Decrypt",
+                                        "kms:ReEncrypt*",
+                                        "kms:GenerateDataKey*",
+                                        "kms:DescribeKey",
+                                        "kms:ListGrants",
+                                        "kms:CreateGrant",
+                                        "kms:RevokeGrant"
+                                    ],
+                                    "Effect": "Allow",
+                                    "Resource": [
+                                        {
+                                            "Ref": "KMSRedshiftKey"
+                                        },
+                                        {
+                                            "Ref": "KMSS3Key"
+                                        }
+                                    ],
+                                    "Sid": "KmsS3Encryption"
+                                },
+                                {
+                                    "Action": [
+                                        "s3:Get*",
+                                        "s3:Put*",
+                                        "s3:List*"
+                                    ],
+                                    "Effect": "Allow",
+                                    "Resource": [
+                                        {
+                                            "Fn::Join": [
+                                                "",
+                                                [
+                                                    "arn:aws:s3:::",
+                                                    {
+                                                        "Ref": "EDWBucket"
+                                                    }
+                                                ]
+                                            ]
+                                        },
+                                        {
+                                            "Fn::Join": [
+                                                "",
+                                                [
+                                                    "arn:aws:s3:::",
+                                                    {
+                                                        "Ref": "EDWBucket"
+                                                    },
+                                                    "/source/*"
+                                                ]
+                                            ]
+                                        },
+                                        {
+                                            "Fn::Join": [
+                                                "",
+                                                [
+                                                    "arn:aws:s3:::",
+                                                    {
+                                                        "Ref": "EDWBucket"
+                                                    },
+                                                    "/edw/*"
+                                                ]
+                                            ]
+                                        }
+                                    ],
+                                    "Sid": "RWAccessToEdw"
+                                }
+                            ],
+                            "Version": "2012-10-17"
+                        },
+                        "PolicyName": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    "edw",
+                                    "redshift",
+                                    "policy",
+                                    {
+                                        "Ref": "Environment"
+                                    },
+                                    {
+                                        "Ref": "EnvironmentTypeIndex"
+                                    }
+                                ]
+                            ]
+                        }
+                    }
+                ],
+                "RoleName": {
+                    "Fn::Join": [
+                        "-",
+                        [
+                            "edw",
+                            "redshift",
+                            "role",
+                            {
+                                "Ref": "Environment"
+                            },
+                            {
+                                "Ref": "EnvironmentTypeIndex"
+                            }
+                        ]
+                    ]
+                }
+            },
+            "Type": "AWS::IAM::Role"
+        }
+    }
+}

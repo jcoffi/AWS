@@ -1,0 +1,99 @@
+{
+"AWSTemplateFormatVersion":"2010-09-09",
+	"Parameters":{
+		"KMSKeyName":{
+		    "Default":"DEV_EDW_S3_Key",
+            "Description":"The name of the KMS key used for this solution.",
+            "Type":"String"
+			},
+		"AttachToRole":{
+			"Description":"Role name what will have access to use this key.",
+			"Default":"edw_data_developer",
+			"Type":"String"
+			},
+		"PolicyName":{
+			"Default":"edw_data_developer_key_policy",
+			"Description":"Name of policy",
+			"Type":"String"
+			},
+		"ServiceRole":{
+			"Description":"The service role with access to the key.",
+			"Type":"String"
+			}
+    },
+	"Resources":{
+		"KMSS3Key":{
+			"Type":"AWS::KMS::Key",
+			"Properties":{
+		    "Tags":[
+                    {
+                        "Key":"Application",
+                        "Value":"Enterprise Data Warehouse POC"
+                    },
+                    {
+                        "Key":"Environment",
+                        "Value":"dev"
+                    },
+                    {
+                        "Key":"Team",
+                        "Value":"EDMS"
+                    },
+					{   "Key":"Name",
+					    "Value":{"Ref":"KMSKeyName"}
+					}
+            ],
+			"Description":"EDW POC Key for S3",
+			"Enabled":"True",
+			"EnableKeyRotation":"True",
+			"KeyPolicy":{
+				"Version":"2012-10-17",
+				"Id":{"Ref":"KMSKeyName"},
+				"Statement":[
+					{
+						"Sid":"EnableIAMUserPermissions",
+						"Effect":"Allow",
+						"Principal":{"AWS":{"Fn::Join":["",["arn:aws:sts::",{"Ref":"AWS::AccountId"},":root"]]}
+						},
+						"Action":"kms:*",
+						"Resource":"*"
+					},
+					{
+						"Sid":"Allow access for Key Administrators",
+						"Effect":"Allow",	
+						"Principal":{"AWS":{"Fn::Join":["",["arn:aws:sts::",{"Ref":"AWS::AccountId"},":root"]],"Fn::Join":["",["arn:aws:sts::",{"Ref":"AWS::AccountId"},":assumed-role/SecurityAdmin/removed.name@corplan.lcl"]],"Fn::Join":["",["arn:aws:sts::",{"Ref":"AWS::AccountId"},":assumed-role/SecurityAdmin/removed.name2@corplan.lcl"]]},
+						"Action":"kms:*",
+						"Resource":"*"
+					},
+					{
+						"Sid":"Allow use of the key by specific roles",
+						"Effect":"Allow",
+						"Principal":{"AWS":{"Fn::Join":["",["arn:aws:iam::",{"Ref":"AWS::AccountId"},":role/",{"Ref":"AttachToRole"}]]}},
+						"Action":[
+						"kms:Encrypt",
+						"kms:Decrypt",
+						"kms:ReEncrypt*",
+						"kms:GenerateDataKey*",
+						"kms:DescribeKey"
+						], 
+						"Resource":"*"
+					},
+					{
+						"Sid": "Allow use of key by AWS Services to create encrypted resources",
+						"Effect": "Allow",
+						"Principal":{"AWS":{"Fn::Join":["",["arn:aws:iam::",{"Ref":"AWS::AccountId"},":role//aws-service-role/redshift.amazonaws.com/AWSServiceRoleForRedshift"]]}},
+						"Action": "kms:CreateGrant",
+						"Resource": "{Fn::GetAtt:[KMSS3Key,Arn]}",
+						"Condition": {
+							"Bool": {"kms:GrantIsForAWSResource": true}
+							}
+					}
+			]
+		}
+	}
+	},
+		"myKeyAlias":{
+			"Type":"AWS::KMS::Alias",
+			"Properties":{
+				"AliasName":{"Fn::Join":["",["alias/",{"Ref":"KMSKeyName"}]]},"TargetKeyId":{"Ref":"KMSS3Key"}}}
+}
+}

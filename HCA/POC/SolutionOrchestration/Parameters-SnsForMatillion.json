@@ -1,0 +1,32 @@
+[
+    {
+        "ParameterKey": "WriteCapacityUnits",
+        "ParameterValue": "5",
+        "UsePreviousValue": true
+    },
+    {
+        "ParameterKey": "HashKeyType",
+        "ParameterValue": "S",
+        "UsePreviousValue": true
+    },
+    {
+        "ParameterKey": "ReadCapacityUnits",
+        "ParameterValue": "5",
+        "UsePreviousValue": true
+    },
+    {
+        "ParameterKey": "Environment",
+        "ParameterValue": "dev",
+        "UsePreviousValue": true
+    },
+    {
+        "ParameterKey": "EnvironmentTypeIndex",
+        "ParameterValue": "01",
+        "UsePreviousValue": true
+    },
+    {
+        "ParameterKey": "HashKeyName",
+        "ParameterValue": "jobId",
+        "UsePreviousValue": true
+    }
+]
