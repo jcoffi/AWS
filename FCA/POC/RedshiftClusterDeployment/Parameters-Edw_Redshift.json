@@ -1,52 +1,52 @@
 [
-    {
-        "ParameterKey": "AdminUserPassword",
-        "ParameterValue": "<insert parameter value here>",
-        "UsePreviousValue": true
-    },
-    {
-        "ParameterKey": "SnapshotClusterIdentifier",
-        "ParameterValue": "",
-        "UsePreviousValue": true
-    },
-    {
-        "ParameterKey": "Environment",
-        "ParameterValue": "<insert parameter value here>",
-        "UsePreviousValue": true
-    },
-    {
-        "ParameterKey": "EnvironmentTypeIndex",
-        "ParameterValue": "<insert parameter value here>",
-        "UsePreviousValue": true
-    },
-    {
-        "ParameterKey": "VPCSecurityGroups",
-        "ParameterValue": "<insert parameter value here>",
-        "UsePreviousValue": true
-    },
-    {
-        "ParameterKey": "KMSRedshiftKey",
-        "ParameterValue": "<insert parameter value here>",
-        "UsePreviousValue": true
-    },
-    {
-        "ParameterKey": "EDWBucket",
-        "ParameterValue": "<insert parameter value here>",
-        "UsePreviousValue": true
-    },
-    {
-        "ParameterKey": "KMSS3Key",
-        "ParameterValue": "<insert parameter value here>",
-        "UsePreviousValue": true
-    },
-    {
-        "ParameterKey": "SnapshotIdentifier",
-        "ParameterValue": "<insert parameter value here>",
-        "UsePreviousValue": true
-    },
-    {
-        "ParameterKey": "ClusterSubnetGroupName",
-        "ParameterValue": "edw-subnetgroup",
-        "UsePreviousValue": true
-    }
+  {
+    "ParameterKey": "AdminUserPassword",
+    "ParameterValue": "<insert parameter value here>",
+    "UsePreviousValue": true
+  },
+  {
+    "ParameterKey": "SnapshotClusterIdentifier",
+    "ParameterValue": "",
+    "UsePreviousValue": true
+  },
+  {
+    "ParameterKey": "Environment",
+    "ParameterValue": "<insert parameter value here>",
+    "UsePreviousValue": true
+  },
+  {
+    "ParameterKey": "EnvironmentTypeIndex",
+    "ParameterValue": "<insert parameter value here>",
+    "UsePreviousValue": true
+  },
+  {
+    "ParameterKey": "VPCSecurityGroups",
+    "ParameterValue": "<insert parameter value here>",
+    "UsePreviousValue": true
+  },
+  {
+    "ParameterKey": "KMSRedshiftKey",
+    "ParameterValue": "<insert parameter value here>",
+    "UsePreviousValue": true
+  },
+  {
+    "ParameterKey": "EDWBucket",
+    "ParameterValue": "<insert parameter value here>",
+    "UsePreviousValue": true
+  },
+  {
+    "ParameterKey": "KMSS3Key",
+    "ParameterValue": "<insert parameter value here>",
+    "UsePreviousValue": true
+  },
+  {
+    "ParameterKey": "SnapshotIdentifier",
+    "ParameterValue": "<insert parameter value here>",
+    "UsePreviousValue": true
+  },
+  {
+    "ParameterKey": "ClusterSubnetGroupName",
+    "ParameterValue": "edw-subnetgroup",
+    "UsePreviousValue": true
+  }
 ]

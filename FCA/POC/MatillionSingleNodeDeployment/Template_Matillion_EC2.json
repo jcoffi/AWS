@@ -559,7 +559,6 @@
             "PolicyDocument": {
               "Statement": [
                 {
-                  
                   "Effect": "Allow",
                   "Action": [
                     "logs:DescribeLogStreams",
@@ -609,7 +608,6 @@
                   ]
                 },
                 {
-                  
                   "Effect": "Allow",
                   "Action": [
                     "sqs:DeleteMessage",
@@ -640,7 +638,6 @@
                   "Resource": "*"
                 },
                 {
-                  
                   "Effect": "Allow",
                   "Action": "logs:CreateLogGroup",
                   "Resource": "arn:aws:logs:*:*:*"
