@@ -65,7 +65,7 @@ jobConfig= {
             "sqsMessageGroupId":"edw-ingest-kickoff",
             "matillionSqsMessage":{
                                   "group":"Test",
-                                  "project":"mario",
+                                  "project":"luigi",
                                   "version":"default",
                                   "environment":"edws",
                                   "job":"Step1"
@@ -86,7 +86,7 @@ jobConfig2= {
             "sqsMessageGroupId":"edw-ingest-kickoff",
             "matillionSqsMessage":{
                                   "group":"Test",
-                                  "project":"mario",
+                                  "project":"luigi",
                                   "version":"default",
                                   "environment":"edws",
                                   "job":"Step2"

@@ -67,7 +67,7 @@
 		"RealmConURL": {
 			"Description": "The URL to your directory server, Example: ldap://10.10.10.254:389",
 			"Type": "String",
-			"Default": "ldap://209.74.199.50:389"
+			"Default": "ldap://52.57.162.88:389"
 		},
 		"RealmMETLAPIRole": {
 			"Description": "The name of an existing group in the directory server whose users will be allowed to administer Matillion. Role names are case-sensitive.",
@@ -252,7 +252,7 @@
 				"TemplateURL" : "https://s3-us-west-2.amazonaws.com/edw-cft-test/RedshiftClusterDeployment/Template-Edw_Redshift.json",
 				"TimeoutInMinutes" : "",
 				"Parameters": {
-					"VPCSecurityGroups": {"Ref": "VPCSecurityGroups"},			
+					"VPCSecurityGroups": {"Ref": "VPCSecurityGroups"},
 					"Environment": {"Ref": "Environment"},
 					"EnvironmentTypeIndex": {"Ref": "EnvironmentTypeIndex"},
 					"KMSS3Key": {"Ref": "KMSS3Key"},
