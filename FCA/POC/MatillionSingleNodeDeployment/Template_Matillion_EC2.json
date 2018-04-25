@@ -559,7 +559,7 @@
             "PolicyDocument": {
               "Statement": [
                 {
-                  "Sid": "VisualEditor0",
+                  
                   "Effect": "Allow",
                   "Action": [
                     "logs:DescribeLogStreams",
@@ -609,7 +609,7 @@
                   ]
                 },
                 {
-                  "Sid": "VisualEditor1",
+                  
                   "Effect": "Allow",
                   "Action": [
                     "sqs:DeleteMessage",
@@ -640,7 +640,7 @@
                   "Resource": "*"
                 },
                 {
-                  "Sid": "VisualEditor3",
+                  
                   "Effect": "Allow",
                   "Action": "logs:CreateLogGroup",
                   "Resource": "arn:aws:logs:*:*:*"

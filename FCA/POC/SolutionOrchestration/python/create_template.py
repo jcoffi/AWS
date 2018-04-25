@@ -135,7 +135,7 @@ def addResources():
                     "Version": "2012-10-17",
                     "Statement": [
                         {
-                            "Sid": "VisualEditor0",
+                            
                             "Effect": "Allow",
                             "Action": [
                                 "dynamodb:BatchGetItem",
@@ -165,7 +165,7 @@ def addResources():
                             "Resource": "arn:aws:logs:*:*:*"
                         },
                         {
-                            "Sid": "VisualEditor1",
+                            
                             "Effect": "Allow",
                             "Action": [
                                 "dynamodb:DescribeReservedCapacityOfferings",
@@ -188,7 +188,7 @@ def addResources():
                     "Version": "2012-10-17",
                     "Statement": [
                         {
-                            "Sid": "VisualEditor0",
+                            
                             "Effect": "Allow",
                             "Action": [
                                 "redshift:CreateSnapshot",
